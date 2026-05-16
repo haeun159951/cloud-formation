@@ -1,0 +1,9 @@
+#CloudFormation Template for S3 Bucket
+
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudFormation Template for S3 Bucket'
+Resources:
+  S3Bucket:
+    Type: 'AWS::S3::Bucket'
+    Properties: # configuration of our s3 bucket
+      BucketName: 'hailey-s3-bucket-yaml'
