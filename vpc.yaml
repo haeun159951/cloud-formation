@@ -1,0 +1,83 @@
+
+
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudFormation Template for VPC'
+Resources:
+  MyVPC:
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      CidrBlock: '172.16.0.0/16'
+      EnableDnsSupport: true # allows instances in the VPC to resolve public DNS hostnames to IP addresses
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: 'MyVPC'
+  # Public subnet in AZ 1 
+  PublicSubnet1A:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref MyVPC # reference to the VPC we just created, logical ID  
+      CidrBlock: '172.16.1.0/24'
+      AvailabilityZone: !Select [ 0, !GetAZs '' ] # selects the first availability zone in the region, helping high availability
+      MapPublicIpOnLaunch: true # When an EC2 instance is launched in this subnet, it will automatically receive a public IP address. This makes the instance directly accessible from the internet.
+      Tags:
+        - Key: Name
+          Value: 'PublicSubnet1A'
+
+  # App Private subnet in AZ 1 
+  AppPrivateSubnet1A:
+      Type: 'AWS::EC2::Subnet'
+      Properties:
+        VpcId: !Ref MyVPC
+        CidrBlock: '172.16.2.0/24'
+        AvailabilityZone: !Select [ 0, !GetAZs '' ] # selects the first availability zone in the region, helping high availability
+        Tags:
+          - Key: Name
+            Value: 'AppPrivateSubnet1A'
+
+  # Data Private subnet in AZ 1 
+  DataPrivateSubnet1A:
+      Type: 'AWS::EC2::Subnet'
+      Properties:
+        VpcId: !Ref MyVPC
+        CidrBlock: '172.16.3.0/24'
+        AvailabilityZone: !Select [ 0, !GetAZs '' ] # selects the first availability zone in the region, helping high availability
+        Tags:
+          - Key: Name
+            Value: 'DataPrivateSubnet1A'
+
+  # SECOND SET OF SUBNETS IN ANOTHER AVAILABILITY ZONE FOR HIGH AVAILABILITY #
+
+# Public subnet in AZ 2
+  PublicSubnet2B:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref MyVPC # reference to the VPC we just created, logical ID  
+      CidrBlock: '172.16.4.0/24'
+      AvailabilityZone: !Select [ 1, !GetAZs '' ] # selects the first availability zone in the region, helping high availability
+      MapPublicIpOnLaunch: true # When an EC2 instance is launched in this subnet, it will automatically receive a public IP address. This makes the instance directly accessible from the internet.
+      Tags:
+        - Key: Name
+          Value: 'PublicSubnet2B'
+          
+# App Private subnet in AZ 2
+  AppPrivateSubnet2B:
+      Type: 'AWS::EC2::Subnet'
+      Properties:
+        VpcId: !Ref MyVPC
+        CidrBlock: '172.16.5.0/24'
+        AvailabilityZone: !Select [ 1, !GetAZs '' ] # selects the first availability zone in the region, helping high availability
+        Tags:
+          - Key: Name
+            Value: 'AppPrivateSubnet2B'
+          
+# Data Private subnet in AZ 2
+  DataPrivateSubnet2B:
+      Type: 'AWS::EC2::Subnet'
+      Properties:
+        VpcId: !Ref MyVPC
+        CidrBlock: '172.16.6.0/24'
+        AvailabilityZone: !Select [ 1, !GetAZs '' ] # selects the first availability zone in the region, helping high availability
+        Tags:
+          - Key: Name
+            Value: 'DataPrivateSubnet2B'          
