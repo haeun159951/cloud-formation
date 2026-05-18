@@ -80,4 +80,53 @@ Resources:
         AvailabilityZone: !Select [ 1, !GetAZs '' ] # selects the first availability zone in the region, helping high availability
         Tags:
           - Key: Name
-            Value: 'DataPrivateSubnet2B'          
+            Value: 'DataPrivateSubnet2B' 
+
+
+  #Internet Gateway to allow communication between the VPC and the internet
+  InternetGateway:
+    Type: 'AWS::EC2::InternetGateway'
+    Properties:
+      Tags:
+        - Key: Name
+          Value: 'MyVPC-IGW'
+
+  # Attach IGW to the VPC
+  AttachInternetGateway:
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Properties:
+      VpcId: !Ref MyVPC
+      InternetGatewayId: !Ref InternetGateway 
+
+  #Route Table for Public Subnets to route traffic to the Internet Gateway  
+  PublicRouteTable:
+    Type: 'AWS::EC2::RouteTable' 
+    Properties:
+      VpcId: !Ref MyVPC
+      Tags:
+        - Key: Name
+          Value: 'PublicRouteTable'
+
+  # Public Routes
+  PublicRoute:
+    Type: 'AWS::EC2::Route'
+    DependsOn: AttachInternetGateway # ensures that the route is created after the IGW is attached to the VPC
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: '0.0.0.0/0' # routes all traffic to the internet
+      GatewayId: !Ref InternetGateway # specifies that the traffic should be routed through the Internet
+
+
+    # Public Subnet 1A Route Table association to associate the public subnet with the public route table, allowing instances in this subnet to use the routes defined in the public route table (like the default route to the internet):
+  PublicSubnet1ARouteTableAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PublicSubnet1A
+      RouteTableId: !Ref PublicRouteTable       aws cloudformation describe-stacks --stack-name vpc-stack --region us-east-1
+
+  # public subnet 2b    
+  PublicSubnet2BRouteTableAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PublicSubnet2B
+      RouteTableId: !Ref PublicRouteTable 
