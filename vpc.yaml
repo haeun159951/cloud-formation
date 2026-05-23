@@ -122,7 +122,7 @@ Resources:
     Type: 'AWS::EC2::SubnetRouteTableAssociation'
     Properties:
       SubnetId: !Ref PublicSubnet1A
-      RouteTableId: !Ref PublicRouteTable       aws cloudformation describe-stacks --stack-name vpc-stack --region us-east-1
+      RouteTableId: !Ref PublicRouteTable
 
   # public subnet 2b    
   PublicSubnet2BRouteTableAssociation:
@@ -130,3 +130,29 @@ Resources:
     Properties:
       SubnetId: !Ref PublicSubnet2B
       RouteTableId: !Ref PublicRouteTable 
+
+  #Bastion Security Group to allow SSH access
+  BastionSG:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: 'Allow SSH access to the bastion host'
+      VpcId: !Ref MyVPC
+      SecurityGroupIngress:
+        - IpProtocol: 'tcp'
+          FromPort: 22
+          ToPort: 22
+          CidrIp: '142.126.157.208/32'
+
+  #Bastion host EC2
+  BastionHost:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      InstanceType: 't3.micro' # t3.micro is Free Tier eligible
+      ImageId: 'ami-0236922087fa98b6e' # Amazon Linux 2 AMI in us-east-1
+      SubnetId: !Ref PublicSubnet1A
+      SecurityGroupIds: 
+        - !Ref BastionSG
+      KeyName: 'bastion' # specify your key pair name
+      Tags:
+        - Key: Name
+          Value: 'BastionHost'
