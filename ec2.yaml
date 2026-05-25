@@ -1,0 +1,222 @@
+
+# EC2
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudFormation Template for EC2'
+Resources:
+  MyVPC:
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      CidrBlock: '172.16.0.0/16'
+      EnableDnsSupport: true # allows instances in the VPC to resolve public DNS hostnames to IP addresses
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: 'MyVPC'
+
+  # Public subnet in AZ 1 
+  PublicSubnet1A:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref MyVPC # reference to the VPC we just created, logical ID  
+      CidrBlock: '172.16.1.0/24'
+      AvailabilityZone: !Select [ 0, !GetAZs '' ] # selects the first availability zone in the region, helping high availability
+      MapPublicIpOnLaunch: true # When an EC2 instance is launched in this subnet, it will automatically receive a public IP address. This makes the instance directly accessible from the internet.
+      Tags:
+        - Key: Name
+          Value: 'PublicSubnet1A'
+
+  # App Private subnet in AZ 1 
+  AppPrivateSubnet1A:
+      Type: 'AWS::EC2::Subnet'
+      Properties:
+        VpcId: !Ref MyVPC
+        CidrBlock: '172.16.2.0/24'
+        AvailabilityZone: !Select [ 0, !GetAZs '' ] # selects the first availability zone in the region, helping high availability
+        Tags:
+          - Key: Name
+            Value: 'AppPrivateSubnet1A'
+
+  # Data Private subnet in AZ 1 
+  DataPrivateSubnet1A:
+      Type: 'AWS::EC2::Subnet'
+      Properties:
+        VpcId: !Ref MyVPC
+        CidrBlock: '172.16.3.0/24'
+        AvailabilityZone: !Select [ 0, !GetAZs '' ] # selects the first availability zone in the region, helping high availability
+        Tags:
+          - Key: Name
+            Value: 'DataPrivateSubnet1A'
+
+  # SECOND SET OF SUBNETS IN ANOTHER AVAILABILITY ZONE FOR HIGH AVAILABILITY #
+
+# Public subnet in AZ 2
+  PublicSubnet2B:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref MyVPC # reference to the VPC we just created, logical ID  
+      CidrBlock: '172.16.4.0/24'
+      AvailabilityZone: !Select [ 1, !GetAZs '' ] # selects the first availability zone in the region, helping high availability
+      MapPublicIpOnLaunch: true # When an EC2 instance is launched in this subnet, it will automatically receive a public IP address. This makes the instance directly accessible from the internet.
+      Tags:
+        - Key: Name
+          Value: 'PublicSubnet2B'
+          
+# App Private subnet in AZ 2
+  AppPrivateSubnet2B:
+      Type: 'AWS::EC2::Subnet'
+      Properties:
+        VpcId: !Ref MyVPC
+        CidrBlock: '172.16.5.0/24'
+        AvailabilityZone: !Select [ 1, !GetAZs '' ] # selects the first availability zone in the region, helping high availability
+        Tags:
+          - Key: Name
+            Value: 'AppPrivateSubnet2B'
+          
+# Data Private subnet in AZ 2
+  DataPrivateSubnet2B:
+      Type: 'AWS::EC2::Subnet'
+      Properties:
+        VpcId: !Ref MyVPC
+        CidrBlock: '172.16.6.0/24'
+        AvailabilityZone: !Select [ 1, !GetAZs '' ] # selects the first availability zone in the region, helping high availability
+        Tags:
+          - Key: Name
+            Value: 'DataPrivateSubnet2B' 
+
+
+  #Internet Gateway to allow communication between the VPC and the internet
+  InternetGateway:
+    Type: 'AWS::EC2::InternetGateway'
+    Properties:
+      Tags:
+        - Key: Name
+          Value: 'MyVPC-IGW'
+
+  # Attach IGW to the VPC
+  AttachInternetGateway:
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Properties:
+      VpcId: !Ref MyVPC
+      InternetGatewayId: !Ref InternetGateway 
+
+  #Route Table for Public Subnets to route traffic to the Internet Gateway  
+  PublicRouteTable:
+    Type: 'AWS::EC2::RouteTable' 
+    Properties:
+      VpcId: !Ref MyVPC
+      Tags:
+        - Key: Name
+          Value: 'PublicRouteTable'
+
+  # Public Routes
+  PublicRoute:
+    Type: 'AWS::EC2::Route'
+    DependsOn: AttachInternetGateway # ensures that the route is created after the IGW is attached to the VPC
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: '0.0.0.0/0' # routes all traffic to the internet
+      GatewayId: !Ref InternetGateway # specifies that the traffic should be routed through the Internet
+
+  # Public Subnet 1A Route Table association to associate the public subnet with the public route table, allowing instances in this subnet to use the routes defined in the public route table (like the default route to the internet):
+  PublicSubnet1ARouteTableAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PublicSubnet1A
+      RouteTableId: !Ref PublicRouteTable
+
+  # public subnet 2b    
+  PublicSubnet2BRouteTableAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PublicSubnet2B
+      RouteTableId: !Ref PublicRouteTable 
+
+  # ALB - APPLICATION LOAD BALANCER - P2
+  MyLoadBalancer:
+    Type: 'AWS::ElasticLoadBalancingV2::LoadBalancer'
+    Properties:
+      Name: 'MyALB'     
+      Subnets:
+        - !Ref PublicSubnet1A
+        - !Ref PublicSubnet2B
+      SecurityGroups: 
+        - !Ref WebServerSecurityGroup   
+  
+  # Target Group for the ALB to route traffic to the EC2 instances
+  MyTargetGroup:
+    Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+    Properties:
+      Port: 80
+      Protocol: 'HTTP'
+      VpcId: !Ref MyVPC
+      TargetType: 'instance'
+      Targets:
+        - Id: !Ref WebServerInstance1A
+          Port: 80
+        - Id: !Ref WebServerInstance2B
+          Port: 80
+
+  # Listener for the ALB to listen for incoming traffic on port 80 and forward it to the target group
+  MyListener:
+    Type: 'AWS::ElasticLoadBalancingV2::Listener'
+    Properties:
+      defaultActions:
+        - Type: 'forward'
+          TargetGroupArn: !Ref MyTargetGroup # reference to the target group we just created, logical ID   
+      LoadBalancerArn: !Ref MyLoadBalancer # reference to the ALB we just created, logical ID
+      Port: 80
+      Protocol: 'HTTP' # the ALB will listen for HTTP traffic on port 80  
+  
+  # Web server / ALB Security Group to allow HTTP and SSH access
+  WebServerSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: 'Enable HTTP to web servers'
+      VpcId: !Ref MyVPC
+      SecurityGroupIngress:
+        - IpProtocol: 'tcp'
+          FromPort: 80
+          ToPort: 80
+          CidrIp: '0.0.0.0/0'
+        
+  # WebserverInstance 1A:
+  WebServerInstance1A:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      ImageId: 'ami-0c94855ba95c71c99' # Amazon Linux 2 AMI ID for us-east-1 region, can be different in other regions
+      InstanceType: 't3.micro' # instance type with 1 vCPU and 1 GB of memory, eligible for the free tier
+      SubnetId: !Ref PublicSubnet1A # reference to the public subnet we created, logical ID
+      SecurityGroupIds:
+        - !Ref WebServerSecurityGroup # reference to the security group we will create for the web server, logical ID
+      Tags:
+        - Key: Name
+          Value: 'WebServerInstance1A'  
+      UserData: # UserData is a script that runs when the EC2 instance is launched, allowing you to automate the setup of the instance (like installing software, configuring settings, etc.)
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          # Install Apache web server and start the service
+          yum install -y httpd
+          systemctl start httpd
+          systemctl enable httpd
+          echo "Hello from WebServerInstance1A" > /var/www/html/index.html
+
+  # WebserverInstance 2B:
+  WebServerInstance2B:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      ImageId: 'ami-0c94855ba95c71c99' 
+      InstanceType: 't3.micro' 
+      SubnetId: !Ref PublicSubnet2B 
+      SecurityGroupIds:
+        - !Ref WebServerSecurityGroup 
+      Tags:
+        - Key: Name
+          Value: 'WebServerInstance2B'  
+      UserData: 
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          # Install Apache web server and start the service
+          yum install -y httpd
+          systemctl start httpd
+          systemctl enable httpd
+          echo "Hello from WebServerInstance2B" > /var/www/html/index.html
