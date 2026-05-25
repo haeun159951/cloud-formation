@@ -1,0 +1,53 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudFormation Template for IAM'
+
+Resources:
+# User
+  MyIAMUser:
+    Type: 'AWS::IAM::User'
+    Properties:
+      UserName: 'haileyCFN'
+      # Attach the AdministratorAccess policy to the user, granting full access to AWS services and resources
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AdministratorAccess'
+  # Group
+  MyIAMGroup:
+    Type: 'AWS::IAM::Group'
+    Properties:
+      GroupName: 'MyIAMGroup'
+  
+  UserToGroupAddition:
+    Type: 'AWS::IAM::UserToGroupAddition'
+    Properties:
+      GroupName: !Ref MyIAMGroup # reference to the group we just created, logical ID
+      Users:
+        - !Ref MyIAMUser
+
+  # Role
+  MyIAMRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service: 'ec2.amazonaws.com' # allows EC2 instances to assume this role
+            Action: 'sts:AssumeRole'
+      # Attach the AdministratorAccess policy to the role, granting full access to AWS services and resourcesM
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/PowerUserAccess' # allows full access to AWS services and resources, but does not allow management of users and groups
+
+  # Policy
+  MyIAMPolicy:
+    Type: 'AWS::IAM::Policy'
+    Properties:
+      PolicyName: 'customPolicy'
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Action: 's3:GetObject' # allows all S3 actions, such as listing buckets, uploading objects, and deleting objects
+            Resource: '*' # allows access to all S3 resources
+      Roles:
+        - !Ref MyIAMRole # reference to the role we just created, logical ID
